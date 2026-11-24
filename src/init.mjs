@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { learnUrl, GROUP_URL } from './learn.mjs';
+import { browserName, egoExecutable } from './browser-config.mjs';
 const STORE_URL = 'https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,7 +41,6 @@ else if (process.platform !== 'darwin') tip('目前只在 macOS 和 Windows 上�
 const chrome = (WIN
   ? [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA].filter(Boolean).map(d => path.join(d, 'Google', 'Chrome', 'Application', 'chrome.exe'))
   : ['/Applications/Google Chrome.app', path.join(os.homedir(), 'Applications/Google Chrome.app')]).find(fs.existsSync);
-chrome ? ok('Google Chrome') : bad('没找到 Google Chrome，请先安装');
 let cf = false; try { execFileSync('which', ['cloudflared'], { stdio: 'pipe' }); cf = true; ok('cloudflared（可选，远程访问用）'); } catch { tip('没装 cloudflared：想在手机上远程看麦田，之后 brew install cloudflared'); }
 
 if (fs.existsSync(CFG) && !(await yes('\n已经有 config.json，要重新生成吗？（旧的会备份成 config.json.bak）', false))) {
@@ -50,9 +50,19 @@ if (fs.existsSync(CFG) && !(await yes('\n已经有 config.json，要重新生成
 console.log('\n二、几个问题（不知道的直接回车，之后可以改 config.json）');
 const ex = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.example.json'), 'utf8'));
 const cfg = { ...ex };
-// 麦田发布助手默认用 Chrome 应用商店版：装进麦田的专用 Chrome，Chrome 自动更新，最后一步「打开专用 Chrome 去登录」时会一起打开商店页
 cfg.plugin = 'store'; delete cfg.pluginDir;
-tip(`1. 麦田发布助手（Chrome 插件）从应用商店装：${STORE_URL}（最后一步会在麦田的专用 Chrome 里打开，点「添加至 Chrome」）`);
+cfg.browser = (await ask(`1. 选择浏览器 ego 或 chrome${WIN ? '（Windows 请显式输入 chrome）' : ''}`, 'ego')).toLowerCase();
+if (!['ego', 'chrome'].includes(cfg.browser) || (WIN && cfg.browser !== 'chrome')) {
+  bad('未选择受支持的浏览器。Windows 请用 chrome，macOS 可用 ego 或 chrome');
+  rl.close(); process.exit(1);
+}
+const browser = browserName(cfg.browser);
+const browserReady = cfg.browser === 'ego' ? egoExecutable(cfg) : chrome;
+browserReady ? ok(browser) : bad(`没找到${browser}，请先安装`);
+tip(`从应用商店在${browser}里安装麦田发布助手：${STORE_URL}`);
+if (cfg.browser === 'ego') {
+  cfg.egoProfile = home(await ask('Ego Lite 的资料路径（在该浏览器的 chrome://version 查看，可稍后在 config.json 填 egoProfile）'));
+} else delete cfg.egoProfile;
 cfg.rootPath = home(await ask('2. 发布工程放在哪个文件夹？（每期一个子目录，里面有成片、封面、publish.json；NAS 或本地都行）', path.join(os.homedir(), 'Movies/发布工程')));
 fs.mkdirSync(cfg.rootPath, { recursive: true });
 const nas = await ask('3. 如果发布工程在 NAS 上，填 SMB 地址，掉线时自动重挂（比如 smb://用户名@192.168.1.10/共享名；不用就回车）');
@@ -78,13 +88,13 @@ console.log('\n三、收尾');
 if (process.platform === 'darwin' && await yes('装成开机自启的守护进程？（推荐，之后自动采数据、发通知）')) {
   spawnSync(path.join(ROOT, 'scripts/install-launchd.sh'), cf && await yes('顺带装远程访问隧道（cloudflared）？', false) ? ['--tunnel'] : [], { stdio: 'inherit' });
 }
-if (chrome && await yes('现在打开专用 Chrome：先从应用商店添加麦田发布助手，再登录各平台？（每个平台扫码或登录一次）')) {
+if (browserReady && await yes(`现在打开${browser}安装麦田发布助手并登录各平台？`)) {
   spawnSync(process.execPath, [path.join(ROOT, 'src/hub.mjs'), 'login'], { stdio: 'inherit' });
 }
 console.log(`
 完成。接下来：
   · 打开 http://localhost:${cfg.web.port}/?key=${cfg.web.key}
-  · 登录完各平台后跑一次体检，只查登录了的平台更快：node src/hub.mjs doctor --only bilibili,xhs${WIN ? '\n  · Windows：双击安装目录里的 4-start.bat 启动麦田（窗口别关），2-login.bat 重新打开专用 Chrome 登录' : ''}
+  · 登录完各平台后跑一次体检，只查登录了的平台更快：node src/hub.mjs doctor --only bilibili,xhs${WIN ? '\n  · Windows：双击安装目录里的 4-start.bat 启动麦田（窗口别关），2-login.bat 重新打开所选浏览器登录' : ''}
   · 只看数据（L1）：已经发过的期用 node src/hub.mjs adopt <工程目录> 登记
   · 分发（L2）：按 skills/maitian-publish 准备发布工程，node src/hub.mjs plan <工程目录>，到点前 node src/hub.mjs run <工程目录>
   · 想先看看效果：node src/demo.mjs（假数据，不碰你的配置）

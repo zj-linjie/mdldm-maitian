@@ -9,6 +9,7 @@ import { buildSalesSummary, salesDateRange } from './sales.mjs';
 import { review } from './review.mjs';
 import { accessEmail } from './access.mjs';
 import { initLogin, sessionOk, handleLogin } from './login.mjs';
+import { browserName, browserOf, egoExecutable } from './browser-config.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(DIR, '..');
 let W = config.web || { port: 8787, key: '' };
@@ -87,6 +88,15 @@ function feed(n = 14) {
   });
 }
 async function chromeUp() { try { const r = await fetch(`http://127.0.0.1:${config.chromePort || 9333}/json/version`, { signal: AbortSignal.timeout(800) }); return r.ok; } catch { return false; } }
+async function browserHealth() {
+  const id = browserOf(config), name = browserName(id);
+  if (id === 'ego') {
+    const ok = !!egoExecutable(config);
+    return { id, name, ok, status: ok ? '已安装' : '待安装' };
+  }
+  const ok = await chromeUp();
+  return { id, name, ok, status: ok ? '在线' : '没开' };
+}
 
 function widgetScript(req, file) {
   let base = `${req.headers['x-forwarded-proto'] || (req.headers['cf-visitor'] ? 'https' : 'http')}://${req.headers.host}`;
@@ -216,7 +226,7 @@ async function handle(req, res) {
     const sales = salesOnly ? buildSalesSummary({ days: siteDays, now: salesNow,
       orders: readable ? db.prepare('SELECT id,title,amount,status,time,kind FROM site_orders ORDER BY time DESC,id DESC LIMIT 10').all() : [],
       syncedAt: readable && getMeta('siteLiveSyncedAt'), ordersSyncedAt: readable && getMeta('siteOrdersSyncedAt'), error: getMeta('siteError'), ordersError: getMeta('siteOrdersError') }) : null;
-    const episodeRows = episodes().sort((a, b) => (b.episode || 0) - (a.episode || 0)).map(e => episodeView(e));
+    const browser = await browserHealth();
     return send(res, 200, { name: config.name || '麦田', siteOn: !!SITE, siteSalesOnly: salesOnly, siteSyncedAt: SITE ? getMeta('siteSyncedAt') : '', siteError: SITE ? getMeta('siteError') : '', learn: learnOn(config) ? learnUrl('maitian-board') : '', siteName: SITE ? SITE.name : '', siteLogo: !!(SITE && config.site.logo), board: config.board && config.board.url, driver: config.driver,
       episodes: episodes().sort((a, b) => (b.episode || 0) - (a.episode || 0)).map(e => episodeView(e)), actions: actions.slice(-8).reverse(),
       site: { days: siteDays, channels: readable && !salesOnly ? db.prepare('SELECT * FROM site_channels ORDER BY revenue DESC').all() : [],
@@ -224,7 +234,7 @@ async function handle(req, res) {
       metrics: db.prepare('SELECT day, episode_id, platform, views, likes, comments, favorites, shares FROM metrics ORDER BY day').all(),
       followers: db.prepare("SELECT day, platform, total, gain, loss, source FROM followers WHERE day >= date('now','localtime','-40 day') ORDER BY day").all(),
       samples: db.prepare('SELECT ts, episode_id, platform, views FROM samples ORDER BY ts').all(),
-      feed: feed(), health: { nas: fs.existsSync(config.rootPath), chrome: await chromeUp(), metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', platforms: platformList() }, now: new Date().toISOString() });
+      feed: feed(), health: { nas: fs.existsSync(config.rootPath), browser, chrome: browser.id === 'chrome' && browser.ok, metricsDay: getMeta('metricsDay') || '', doctorDay: getMeta('doctorDay') || '', platforms: platformList() }, now: new Date().toISOString() });
   }
   if (u.pathname === '/site-logo') { const f = SITE && config.site.logo && path.resolve(ROOT, config.site.logo); return f && fs.existsSync(f) ? send(res, 200, fs.readFileSync(f), /\.svg$/.test(f) ? 'image/svg+xml' : /\.jpe?g$/.test(f) ? 'image/jpeg' : 'image/png', { 'cache-control': 'max-age=3600' }) : send(res, 404, ''); }
   if (u.pathname === '/api/episode') { const ep = getEpisode(u.searchParams.get('id')); return ep ? send(res, 200, episodeView(ep, true)) : send(res, 404, { error: '没有这一期' }); }
@@ -245,10 +255,11 @@ async function handle(req, res) {
     try { targets = accountTargets(JSON.parse(fs.readFileSync(CFG, 'utf8'))); }
     catch { return send(res, 400, { error: '账号配置无效' }); }
     const direct = (process.env.HUB_DRIVER || config.driver || 'direct') === 'direct';
+    const browser = browserOf(config);
     if (req.method === 'GET') {
       const { accountTrafficView } = await import('./account-traffic.mjs');
       return send(res, 200, { ...accountTrafficView(db, targets.map(t => t.id)),
-        accounts: targets.map(({ id, platform, name, accountId }) => ({ id, platform, name, accountId })), direct });
+        accounts: targets.map(({ id, platform, name, accountId }) => ({ id, platform, name, accountId })), direct, browser });
     }
     if (req.method !== 'POST') return send(res, 405, { error: '不支持的请求方法' });
     const origin = req.headers.origin;
@@ -260,6 +271,7 @@ async function handle(req, res) {
     const login = a.type === 'metricsLogin';
     const target = login && targets.find(t => t.platform === 'bilibili' && t.id === a.id);
     if (login && (!direct || !target)) return send(res, 400, { error: '请在 direct 模式选择已启用的 B站账号' });
+    if (login && browser === 'ego' && target.accountId !== 'default') return send(res, 400, { error: 'B站副号需要显式设置 browser: chrome' });
     if (!login && actions.some(x => !x.done && x.type !== 'mark')) return send(res, 409, { error: '上一个操作还在跑，等它结束' });
     const rec = { type: a.type, label: login ? `打开账号登录页 · ${target.name}` : '采集账号作品', startedAt: new Date().toISOString(), done: false, ok: null, tail: '' };
     actions.push(rec);

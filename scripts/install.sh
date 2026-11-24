@@ -18,7 +18,7 @@ for R in mdldm-maitian; do
 done
 
 say "麦田发布助手（Chrome 插件）"
-echo "从 Chrome 应用商店装，安装向导最后会在麦田的专用 Chrome 里打开商店页，点「添加至 Chrome」即可，之后自动更新"
+echo "安装向导最后会在你选择的浏览器里打开应用商店。默认使用 Ego Lite。"
 
 say "发布 skill"
 L="$HOME/.claude/skills/maitian-publish"

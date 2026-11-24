@@ -22,7 +22,7 @@ function connection(options = config) {
 const current = () => context.getStore() || connection();
 const owner = (id) => { const c = owners.get(id); if (!c) throw new Error(`No tab with id: ${id}.`); return c; };
 export const withBrowser = (options, fn) => context.run(connection(options), fn);
-export const launchChrome = (options) => current().launchChrome(options);
+export const launchBrowser = (options) => current().launchChrome(options);
 export const adoptTargets = (re) => current().adoptTargets(re);
 export function closeConnection() { for (const c of connections.values()) c.closeConnection(); connections.clear(); }
 

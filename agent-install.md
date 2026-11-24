@@ -17,7 +17,7 @@
 - macOS 或 Windows 10/11
 - git
 - Node.js ≥ 22.5（用到内置 `node:sqlite`）
-- Google Chrome
+- macOS 默认用 Ego Lite。Windows 使用显式配置的 Google Chrome。
 
 ## 步骤
 
@@ -112,9 +112,9 @@ cp config.example.json config.json
 
    向导最后会给出大屏地址 `http://localhost:8787/?key=<web.key>`，请用户在浏览器打开。
 
-2. **装麦田发布助手（Chrome 插件）**：请用户在麦田的专用 Chrome 里打开 [Chrome 应用商店](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)，点「添加至 Chrome」，之后自动更新。
+2. **装麦田发布助手（Chrome 插件）**：请用户在选定浏览器的 [Chrome 应用商店](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj) 安装。Ego Lite 的资料路径见其 `chrome://version`，把路径填进 `config.json` 的 `egoProfile`。
 
-3. **登录各平台**：请用户在专用 Chrome 里登录要发布的平台账号。
+3. **登录各平台**：请用户在麦田选定的浏览器里登录要发布的平台账号。
 
 ### 6. 验证
 

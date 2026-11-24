@@ -40,7 +40,7 @@ node src/make-publish.mjs <发布素材.md> <工程目录>
 node src/validate.mjs <工程目录>
 ```
 
-`login`、`run`、`metrics`、`followers`、`doctor`、`daemon` 会启动专用 Chrome（默认 CDP `9333`）并操作已登录的创作者后台。不要为了验证代码去跑它们，除非用户明确要求。
+`login`、`run`、`metrics`、`followers`、`doctor`、`daemon` 会调用选定浏览器并操作已登录的创作者后台。真实后台验收需要用户明确要求。
 
 ## 架构
 
@@ -50,7 +50,7 @@ node src/validate.mjs <工程目录>
 
 配置从 `config.json` 读，路径可被 `MAITIAN_CONFIG` 覆盖。`src/feishu.mjs` 在 import 时就读配置，文件不存在会 `process.exit(1)`。因此测试必须在 import 任何 `src/*.mjs` **之前**把 `MAITIAN_CONFIG`（以及会写库的用例的 `MAITIAN_DB`）指到临时文件。`config.json`、`config.json.bak`（`config-admin.mjs` 保存前的备份）、`data/`、`chrome-profile/` 都在 `.gitignore` 里，不要提交。
 
-浏览器驱动在 `src/driver.mjs`：默认 `driver: direct`，用 `src/chrome-shim.mjs` 在 Node 里模拟插件要的 `chrome.tabs` / `chrome.debugger`，再动态 `import` 插件目录里的 `lib/publish.js`。`driver: plugin` 则走 `src/bridge.mjs` 的开发桥。插件目录由 `src/plugin.mjs` 决定：`plugin: store`（默认）读专用 Chrome 资料目录里商店版的最新版本；`plugin: local` 用 `pluginDir`。字段字数、禁词、封面规则也从插件的 `lib/bundle.js` 来，`validate.mjs` 只额外检查成片 faststart（moov 在文件头）。改「某个平台怎么填表」不在本仓库，在发布助手里。
+浏览器入口在 `src/driver.mjs`。默认通过 `ego-browser` 使用 Ego Lite 的独立 Space。显式设置 `browser: chrome` 可用专用 Chrome（默认 CDP `9333`），也可连插件开发桥。发布助手由 `src/plugin.mjs` 加载，字段规则来自它的 `lib/bundle.js`。浏览器设置和升级说明见 [README 的安装与配置](README.md#一行装好)。
 
 平台 id：`bilibili`、`douyin`、`xhs`、`channels`、`youtube`、`x`、`instagram`，自有站点是 `zsz`。`config.auto` 里的平台回读核对后自动提交一次；`config.manual`（国内四家）填完停在 `awaiting_user`，最后一下留给人点。`config.batches` 控制上传批次，一次传太多会抢带宽。账号作品流量（`account-*.mjs`、`hub metrics-accounts`）和发布工程是两套数据，采集不会创建待发布任务。B 站副号只在 `bilibiliAccounts` 里，不参与发布。
 

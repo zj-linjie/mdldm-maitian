@@ -50,7 +50,7 @@
 | 部分 | 做什么 | 在哪 |
 |---|---|---|
 | 发布 skill | 让 AI 助手（Claude Code / Codex）看片、写各平台文案、生成发布工程并校验 | 本仓库 [`skills/maitian-publish`](skills/maitian-publish/SKILL.md) |
-| 麦田发布助手 | Chrome 插件，各平台适配器：打开上传页、传视频和封面、填文案、设定时 | [Chrome 应用商店](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)（装进麦田的专用 Chrome，自动更新） |
+| 麦田发布助手 | 浏览器扩展，各平台适配器：打开上传页、传视频和封面、填文案、设定时 | [Chrome 应用商店](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)（装进麦田所用的浏览器） |
 | 麦田（本仓库） | 分发计划、调度、防重、等你点发布、取链接、采数据、网页大屏、飞书通知 | 本仓库 |
 
 链路：成片 → skill 写「发布素材.md」→ 生成 `publish.json` → `hub plan` 进分发计划 → `hub run` 分批填写 → 国内平台你点发布 → 到点取链接 → 每天采数据 → 大屏和飞书卡片。
@@ -73,7 +73,7 @@
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/CzzzzzzJ/mdldm-maitian/main/scripts/install.sh)"
 ```
 
-下载麦田和发布助手到 `~/maitian/`、接上发布 skill、打开安装向导；向导问完几个问题，生成配置、装好开机自启、打开各平台登录页。需要 macOS、Node.js ≥ 22.5、Google Chrome。
+下载麦田和发布助手到 `~/maitian/`、接上发布 skill、打开安装向导；向导问完几个问题，生成配置、装好开机自启、打开各平台登录页。需要 macOS、Node.js ≥ 22.5 和 Ego Lite。
 
 Windows（社区贡献，感谢 [ajin558](https://github.com/ajin558)；开机自启暂未适配）：
 
@@ -81,7 +81,7 @@ Windows（社区贡献，感谢 [ajin558](https://github.com/ajin558)；开机�
 powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/CzzzzzzJ/mdldm-maitian/main/scripts/install-windows.ps1 | iex"
 ```
 
-同样下载到 `%USERPROFILE%\maitian\`、接上发布 skill、打开安装向导，安装目录里另有 4 个双击启动器（演示 / 登录 / 体检 / 启动）。需要 Windows 10/11、Node.js ≥ 22.5、Google Chrome；缺 Git / Node 时脚本会用 winget 自动补装。开机自启暂未适配（向导里的 launchd 步骤会自动跳过），可用任务计划程序指向安装目录的 `4-start.bat` 代替。
+同样下载到 `%USERPROFILE%\maitian\`、接上发布 skill、打开安装向导，安装目录里另有 4 个双击启动器（演示 / 登录 / 体检 / 启动）。需要 Windows 10/11、Node.js ≥ 22.5、Google Chrome；缺 Git / Node 时脚本会用 winget 自动补装。向导请选择 `chrome`。开机自启暂未适配（向导里的 launchd 步骤会自动跳过），可用任务计划程序指向安装目录的 `4-start.bat` 代替。
 
 <p align="center"><img src="https://github.com/CzzzzzzJ/mdldm-maitian/releases/download/media/maitian-install.gif" width="720" alt="一行安装演示" /></p>
 
@@ -89,12 +89,12 @@ powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.c
 
 或者手动：
 
-需要：macOS、Node.js ≥ 22.5（用到内置 `node:sqlite`）、Google Chrome；可选 NAS（放成片）、飞书群机器人、cloudflared。
+需要 Node.js ≥ 22.5（用到内置 `node:sqlite`）。macOS 默认用 [Ego Lite](https://lite.ego.app/download)，完成浏览器初始化后应能运行 `ego-browser --version`。Windows 请在安装向导显式选择 `chrome`。NAS、飞书群机器人和 cloudflared 可以按需配置。
 
 ```bash
 git clone https://github.com/CzzzzzzJ/mdldm-maitian.git && cd mdldm-maitian
 node src/demo.mjs                       # 先用假数据看看效果：http://localhost:8788/?key=demo
-node src/init.mjs                       # 安装向导：检查环境、生成 config.json、装开机自启；在专用 Chrome 里从应用商店添加麦田发布助手、登录各平台
+node src/init.mjs                       # 安装向导，配置麦田的浏览器并打开平台登录页
 node src/hub.mjs doctor                 # 登录完检查各平台登录态和上传页（不上传、不填写）
 ```
 
@@ -102,26 +102,32 @@ node src/hub.mjs doctor                 # 登录完检查各平台登录态和�
 
 ### 三级上手
 
+macOS 使用 Ego Lite 时，先在 Ego Lite 里安装发布助手，并将该浏览器 `chrome://version` 显示的资料路径填入 `config.json` 的 `egoProfile`。麦田使用 Ego Lite 当前的默认资料，已有的平台登录态会一起使用。终端或守护进程找不到命令时，可以把 `egoCommand` 设为 `ego-browser` 的绝对路径。
+
+Ego Lite 遇到浏览器权限提示时会把 Space 交给你。麦田会保留该 Space。填写中断时，先在原标签页核对上传状态，再决定是否重跑。
+
+更新已有安装时，配置中没有 `browser` 的工作台也会默认使用 Ego Lite。希望继续使用专用 Chrome、B 站副号或 `driver: "plugin"` 开发桥时，在 `config.json` 里显式设置 `"browser": "chrome"`。
+
 | 级别 | 你能得到 | 要装的 | 大概时间 |
 |---|---|---|---|
-| L1 只看数据 | 各平台粉丝、已发作品的播放互动、大屏、飞书日报 | 麦田；专用 Chrome 里登录各平台；已发的期用 `hub adopt` 登记 | 30 分钟 |
-| L2 分发 | 一期一次填好七个平台，定时，自动取链接 | + [麦田发布助手](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)（应用商店装进专用 Chrome）；+ 发布 skill（或手写 `publish.json`） | 再 1 小时 |
+| L1 只看数据 | 各平台粉丝、已发作品的播放互动、大屏、飞书日报 | 麦田；在选定浏览器里登录各平台；已发的期用 `hub adopt` 登记 | 30 分钟 |
+| L2 分发 | 一期一次填好各平台，定时，自动取链接 | + [麦田发布助手](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)；+ 发布 skill（或手写 `publish.json`） | 再 1 小时 |
 | L3 转化 | 每期带来的注册和收入 | + 你自己的站点按 `src/site.mjs` 的接口接入 | 看站点 |
 
 ## 它做什么
 
-- **播种（发布）**：读 NAS 上的一期发布工程（成片、封面、各平台文案、定时），按批次在专用 Chrome 里填好各平台上传页。
+- **播种（发布）**：读 NAS 上的一期发布工程（成片、封面、各平台文案、定时），按批次在选定浏览器里填好各平台上传页。
   - X、YouTube、Instagram、自有站点：回读文案和定时一致后自动提交，只点一次。
   - B站、抖音、小红书、视频号：**填好就停**，等你自己点「发布 / 定时发布」，守护进程每 20 分钟提醒。
   - 防重：库里已经到位的平台不再跑；X 定时列表、YouTube Studio、Instagram 主页、站点后台已有同名的不再传。
-- **长势（流量和粉丝）**：每天上午采一次各期在各平台的播放和互动、各平台粉丝数；新一期头三天每 6 小时采一次。「账号作品」能单独查看 B站、抖音、小红书现有作品，不用登记发布工程。点「采集账号流量」或运行 `node src/hub.mjs metrics-accounts`；直连模式会自动启动专用 Chrome，首次需先登录。可在 `config.json` 中设置 `"accountTrafficAuto": true`，随每天的流量日报采集。失败时保留上次成功数据。
+- **长势（流量和粉丝）**：每天上午采一次各期在各平台的播放和互动、各平台粉丝数；新一期头三天每 6 小时采一次。「账号作品」能单独查看 B站、抖音、小红书现有作品，不用登记发布工程。点「采集账号流量」或运行 `node src/hub.mjs metrics-accounts`；直连模式会启动选定浏览器，首次需先登录。可在 `config.json` 中设置 `"accountTrafficAuto": true`，随每天的流量日报采集。失败时保留上次成功数据。
   - B站副号可在 `bilibiliAccounts` 配置（例如 `[{ "id": "second", "name": "副号" }]`）。副号需要 `direct` 模式并使用独立的调试端口和 Chrome 登录目录（默认按 ID 分配，亦可显式设置 `chromePort`、`chromeProfile`）。可填 `uid` 防止登错号；首次成功采集后也会校验历史归属。副号不参与发布。
 - **收成（转化，可选）**：接上自有站点后，看注册、会员、订单、收入从哪个渠道、哪一期来。
 - **日历**：上周到未来两周，已发布、已定时、等你点、计划中的期一眼看清。
 - **粮仓（档案）**：每期的封面、文案快照、各平台链接、过程日志。
 - **复盘（数据分析）**：每期发布后第 1/3/7 天自动出复盘卡片：各平台占比、互动率、和上一期同龄对比（第 N 天对第 N 天）、期间涨粉、带来的注册；每周一出周报。网页单期页有同一份复盘表，转化页有每期转化漏斗（播放 → 注册 → 会员 → 收入）。
 - **飞书通知**：开跑、每个平台到位、异常、等你点发布、定时被平台改掉、每日日报、复盘和周报，都是带颜色的卡片。webhook 和「飞书验证码登录」开关可以在网页「系统 → 集成」里编辑、测试，保存即生效。
-- **平台管理**：网页「系统 → 平台」列出每个平台的登录状态（体检结果），掉线了点「去登录」只打开这一家的后台，在跑麦田的那台 Mac 上用专用 Chrome 扫码；「全部检查」就是一次体检。不用的平台可以停用（不体检、不发布、不采粉丝），会写进 `config.json` 的 `disabled`。同一个平台登多个账号、在网页里嵌扫码做不到：登录态在专用 Chrome 的 profile 里，一个平台只有一份。
+- **平台管理**：网页「系统 → 平台」列出每个平台的登录状态（体检结果），掉线了点「去登录」只打开这一家的后台，在跑麦田的电脑上用选定浏览器扫码；「全部检查」就是一次体检。不用的平台可以停用（不体检、不发布、不采粉丝），会写进 `config.json` 的 `disabled`。同一个平台登多个账号、在网页里嵌扫码做不到：登录态存放在选定浏览器的资料目录。B 站副号使用专用 Chrome。
 
 ## 各平台的坑（实战总结）
 
@@ -138,7 +144,7 @@ node src/hub.mjs doctor                 # 登录完检查各平台登录态和�
 
 ```
             ┌────────────── Mac（常开）──────────────┐
-NAS 发布工程 │  hub.mjs 守护进程 ──── 专用 Chrome（CDP 9333）── 各平台创作者后台
+NAS 发布工程 │  hub.mjs 守护进程 ──── Ego Lite / 专用 Chrome ── 各平台创作者后台
 publish.json ─▶│     │  ▲                 ▲                       │
 成片/封面     │     │  │ 平台适配器（麦田发布助手 lib/）       │
             │     ▼  │                                          │
@@ -148,7 +154,7 @@ publish.json ─▶│     │  ▲                 ▲                       �
             └───────────────────────────────────────────────┘
 ```
 
-- 平台填写逻辑在 [麦田发布助手](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)（Chrome 插件）里。插件从应用商店装进麦田的专用 Chrome 后由 Chrome 自动更新，麦田直接加载专用 Chrome 里这份插件的发布引擎（`src/plugin.mjs`），平台改版时插件更新一次，所有人自动生效。`src/chrome-shim.mjs` 在 Node 里模拟插件需要的 `chrome.tabs` / `chrome.debugger`。
+- 平台填写逻辑在 [麦田发布助手](https://chromewebstore.google.com/detail/eaaipbilkhibicihiollecmbpneikpnj)（Chrome 插件）里。从应用商店安装后，麦田加载插件的发布引擎（`src/plugin.mjs`）。浏览器驱动为插件提供 `chrome.tabs` 和 `chrome.debugger`。Ego Lite 通过 `ego-browser` 操作独立 Space。
 - 发布工程 `publish.json` 由 `src/make-publish.mjs` 从一份 Markdown 发布素材生成，`src/validate.mjs` 校验（字数、禁词、封面比例、成片 faststart 等），字段规则跟着插件走。
 
 </details>
@@ -157,7 +163,7 @@ publish.json ─▶│     │  ▲                 ▲                       �
 <summary><b>命令</b></summary>
 
 ```bash
-node src/hub.mjs login [--only bilibili,channels]   # 打开专用 Chrome 登录页（不带 --only = 全开；网页「系统 → 平台」按平台打开）
+node src/hub.mjs login [--only bilibili,channels]   # 在选定浏览器打开平台登录页，网页「系统 → 平台」也可按平台打开
 node src/hub.mjs doctor [--only a,b] [--quiet]      # 体检登录态，结果给网页用；--quiet 不发飞书
 node src/hub.mjs plan [工程目录]            # 登记进分发计划（不带目录 = 扫描 rootPath）
 node src/hub.mjs run <工程目录> [--only x,zsz] [--force] [--now]   # 发一期；--now 让站点课程立即上线（默认推迟到定时前 30 分钟）
@@ -182,7 +188,9 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 
 | 项 | 说明 |
 |---|---|
-| `plugin` | `store`（默认）：用专用 Chrome 里从应用商店装的麦田发布助手 |
+| `browser` | `ego`（默认）；只有显式设为 `chrome` 才会使用专用 Chrome |
+| `egoProfile` / `egoCommand` | Ego Lite 的资料路径；可选的 `ego-browser` 可执行文件绝对路径 |
+| `plugin` | `store`（默认）：用选定浏览器安装的发布助手；`local` 用 `pluginDir` 指定发布助手目录 |
 | `rootPath` / `nasUrl` | 发布工程根目录；NAS 掉线或被挂到「…-1」时守护进程会自己卸掉重挂 |
 | `batches` | 上传批次。一次传太多平台会互相抢带宽导致超时，建议国内两两一批 |
 | `auto` / `manual` | 自动提交 / 等你点发布的平台 |
@@ -224,7 +232,7 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 }
 ```
 
-运行 `node src/hub.mjs login --only zsz`，在麦田专用 Chrome 中登录并进入店铺。运行 `node src/hub.mjs board` 首次同步，随后可在大屏和「销售」查看当天、近 7 天、近 30 天的支付、退款、订单及最近 10 笔订单。守护进程每 10 分钟更新一次，按北京时间每日补齐最近 30 个完整自然日。订单仅保存编号、商品、金额、状态和下单时间。销售模式下，小鹅通不参与课程发布。
+运行 `node src/hub.mjs login --only zsz`，在选定浏览器中登录并进入店铺。运行 `node src/hub.mjs board` 首次同步，随后可在大屏和「销售」查看当天、近 7 天、近 30 天的支付、退款、订单及最近 10 笔订单。守护进程每 10 分钟更新一次，按北京时间每日补齐最近 30 个完整自然日。订单仅保存编号、商品、金额、状态和下单时间。销售模式下，小鹅通不参与课程发布。
 
 已结束日期的退款来自每日统计。需要当天退款时，可在 `site.refundQuery` 中填写当前店铺后台「退款趋势图」查询的 JSON 请求体（只需请求体，无需请求头或 Cookie）。同步时会自动替换日期，按「退款金额」字段取值。缺少当天报表或数据时，退款和支付净额显示为「–」。每个销售数据库绑定一家店铺，换店时请使用单独的 `MAITIAN_DB` 数据库路径。
 
@@ -236,7 +244,7 @@ node src/hub.mjs daemon                     # 常驻（install-launchd.sh 装的
 不配 `config.site` 就整块关掉，网页上不显示站点卡片，「转化」页只说明怎么接。要看转化：
 
 1. 发布 skill 会在 B站、YouTube、X 的链接上带 `utm_campaign=<主题>-<序号>`；你的站点记下访客第一次带来的这个参数，注册和下单时一起存。
-2. 站点提供两个只读接口给麦田（用专用 Chrome 里的管理员登录态去调），字段见 [`src/site.mjs`](src/site.mjs) 顶部注释。
+2. 站点提供两个只读接口给麦田（用选定浏览器里的管理员登录态去调），字段见 [`src/site.mjs`](src/site.mjs) 顶部注释。
 3. 在 `config.site` 里填站点地址和接口路径。也可以直接在网页「系统 → 集成」里编辑、点「测试连接」，保存即生效（不用重启守护进程）。
 
 作者用自己的课程站做了示例；你的站结构不同，改 `src/site.mjs` 和转化页即可。

@@ -70,7 +70,7 @@ foreach ($b in @('1-demo.bat','2-login.bat','3-doctor.bat','4-start.bat')) {
 
 # ---------- 5. 麦田发布助手（Chrome 插件） ----------
 Say '麦田发布助手（Chrome 插件）'
-Write-Host '  从 Chrome 应用商店装：安装向导最后会在麦田的专用 Chrome 里打开商店页，点「添加至 Chrome」即可，之后自动更新'
+Write-Host '  在安装向导显式输入 chrome。向导会在麦田的专用 Chrome 里打开应用商店安装麦田发布助手。'
 
 # ---------- 6. 发布 skill ----------
 Say '发布 skill'

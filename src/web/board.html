@@ -391,11 +391,11 @@ function render() {
       <div class="sp">${sp}</div>
       <div class="ft"><div><span title="${cur ? esc(cur.name) : ''}">${cur ? esc(cur.nick) : '本期'}</span><b>${on && mc ? fmt(mc.views) : tc ? esc(tc.stateCn) : '–'}</b></div><div>${prev || ref ? `<span title="${esc((prev || ref).name)}">${esc((prev || ref).nick)}</span>` : '上期'}<b>${mr ? fmt(mr.views) : '–'}${mr && mr.views >= 50 ? `<span style="display:block;font-weight:400;font-size:11.5px;color:var(--t3)">互动率 ${pct(inter(mr), mr.views, 1)}</span>` : ''}</b></div></div></div>`;
   };
-  const f0 = O.feed[0];
+  const f0 = O.feed[0], browser = h.browser || { name: '专用浏览器', ok: h.chrome, status: h.chrome ? '在线' : '没开' };
   $('#screen').innerHTML = `
   <div class="top"><div class="logo">麦田</div><div class="tag">内容与粉丝监控</div>
     <div class="nav"><a class="on" href="/">大屏</a><a href="/p#/traffic">流量</a><a href="/p#/calendar">日历</a><a href="/p#/convert">${O.siteSalesOnly ? '销售' : '转化'}</a><a href="/p#/archive">档案</a><a href="/p#/system">系统</a></div>
-    <div class="lights"><span class="light ok">守护进程 运行中</span><span class="light ${h.nas ? 'ok' : 'bad'}">NAS ${h.nas ? '已挂载' : '读不到'}</span><span class="light ${h.chrome ? 'ok' : 'bad'}">专用浏览器 ${h.chrome ? '在线' : '没开'}</span>
+    <div class="lights"><span class="light ok">守护进程 运行中</span><span class="light ${h.nas ? 'ok' : 'bad'}">NAS ${h.nas ? '已挂载' : '读不到'}</span><span class="light ${browser.ok ? 'ok' : 'bad'}">${esc(browser.name)} ${esc(browser.status)}</span>
       <span class="light ${lc}">${lt}</span></div>
     <div class="clock" id="clock"></div></div>
 

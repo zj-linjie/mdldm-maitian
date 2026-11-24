@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 发布中控：分批发布、状态落盘、防重、飞书通知、自动取链接
-//   hub login [--only a,b]                      打开专用 Chrome 的平台登录页，供你登录（网页「系统 → 平台」按平台打开）
+//   hub login [--only a,b]                      打开选定浏览器的平台登录页，供你登录（网页「系统 → 平台」按平台打开）
 //   hub doctor [--only a,b] [--quiet]           检查平台登录态和上传页结构（不上传、不填写），结果给网页用
 //   hub run <工程目录> [--only a,b] [--force]   发起（或续跑）一期
 //   hub status [id] [--logs]                    看状态
@@ -22,7 +22,7 @@ import * as drv from './driver.mjs';
 import { SITE } from './site.mjs';
 import { learnOn, learnUrl, GROUP_URL } from './learn.mjs';
 import { validateProject } from './validate.mjs';
-import { STORE_URL, pluginInfo } from './plugin.mjs';
+import { STORE_URL, pluginDir, pluginInfo } from './plugin.mjs';
 import { xExisting, xSubmit, ytRows, ytSubmit, zszCourses, douyinTopics, igExisting, igSubmit } from './checks.mjs';
 // 出错时附一次交流群和教程入口；每天最多一次，不刷屏（config.learnLinks = false 关掉）
 function helpTip() {
@@ -204,7 +204,7 @@ async function run() {
     await drv.ensure();
     const lr = await drv.checkLogin(todo.filter(i => i !== 'zsz'));
     loggedOut = todo.filter(i => i !== 'zsz' && lr[i] && !lr[i].ok);
-    if (loggedOut.length) await notify(`🔑 ${ep.name}\n这些平台没登录：${loggedOut.map(i => NAMES[i]).join('、')}\n请现在在专用 Chrome 里扫码，其他平台先跑；扫完 20 分钟内会自动补跑\n${loggedOut.map(i => LOGIN_PAGES[i]).join('\n')}`);
+    if (loggedOut.length) await notify(`🔑 ${ep.name}\n这些平台没登录：${loggedOut.map(i => NAMES[i]).join('、')}\n请现在在${drv.browserLabel}里扫码，其他平台先跑；扫完 20 分钟内会自动补跑\n${loggedOut.map(i => LOGIN_PAGES[i]).join('\n')}`);
   } catch (e) { console.error('开跑前登录检查出错：' + e.message); }
   await notify(`🚀 开始发布：${ep.name}\n定时：${pj.schedule ? pj.schedule.replace('T', ' ').slice(0, 16) : '立即'}\n本轮：${todo.map(i => NAMES[i]).join('、')}\n顺序：${config.batches.map(b => b.filter(i => todo.includes(i)).map(i => NAMES[i]).join('+')).filter(Boolean).join(' → ')}`);
 
@@ -338,7 +338,7 @@ async function metricsReport(list, { accounts = true } = {}) {
 
 async function doctor() {
   const p = pluginInfo();
-  if (!p.dir) throw new Error(`还没装麦田发布助手：运行 node src/hub.mjs login，在专用 Chrome 里从应用商店添加（${STORE_URL}）`);
+  if (!p.dir) pluginDir();
   console.log(`麦田发布助手：${p.source === 'store' ? '商店版' : '本地'} ${p.version || ''}`);
   await drv.ensure();
   const only = opt('--only') ? opt('--only').split(',').filter(id => LOGIN_PAGES[id]) : null;
@@ -355,7 +355,7 @@ async function doctor() {
     setMeta(`loginDay:${id}`, day);
   }
   console.log(lines.join('\n'));
-  if (!args.includes('--quiet') && (args.includes('--notify') || bad.length)) await notify(`🩺 发布中控体检（${drv.mode === 'plugin' ? '插件方式' : '专用 Chrome'}）\n${lines.join('\n')}${bad.length ? helpTip() : ''}`);
+  if (!args.includes('--quiet') && (args.includes('--notify') || bad.length)) await notify(`🩺 发布中控体检（${drv.browserLabel}）\n${lines.join('\n')}${bad.length ? helpTip() : ''}`);
   return bad;
 }
 
@@ -376,7 +376,7 @@ async function ensureNas() {
 }
 
 // X 长文模式（作者自用）：需要 config.plugin = 'local' 且本地插件目录里有 tools/x-article-quote.mjs
-const articleOn = () => config.plugin === 'local' && !!config.pluginDir && fs.existsSync(path.join(config.pluginDir, 'tools/x-article-quote.mjs'));
+const articleOn = () => drv.browser === 'chrome' && config.plugin === 'local' && !!config.pluginDir && fs.existsSync(path.join(config.pluginDir, 'tools/x-article-quote.mjs'));
 // 到点前启动插件仓库里的 tools/x-article-quote.mjs（走日常 Chrome 里插件的开发桥）
 const extId = () => config.extensionId || [...crypto.createHash('sha256').update(path.resolve(config.pluginDir)).digest('hex').slice(0, 32)].map(c => String.fromCharCode(97 + parseInt(c, 16))).join('');
 function startArticleJob(ep, pj) {
@@ -418,7 +418,7 @@ function scanPlans() {
 // 常驻：每 5 分钟看一眼。到了定时时间自动取链接；你还没点的平台定时提醒并检查
 async function daemon() {
   if (!process.env.HUB_NO_WEB && config.web) { const { startWeb } = await import('./web.mjs'); startWeb(); }
-  console.log(`发布中控守护进程启动（${drv.mode}）`);
+  console.log(`发布中控守护进程启动（${drv.browserLabel} / ${drv.mode}）`);
   // 开机后 NAS 往往比守护进程晚挂上：等一等，自己挂一次（密码在钥匙串里），5 分钟还不行再报警
   { let ok = false; for (let i = 0; i < 10 && !(ok = await ensureNas()); i++) await drv.sleep(30000);
     if (ok) console.log('NAS 可读'); else await notify('⚠️ 麦田守护进程启动 5 分钟后仍读不到 NAS（已尝试自动挂载），取链接和封面会失败，请检查 NAS 是否开机'); }
@@ -474,7 +474,7 @@ async function daemon() {
           // 原因直接挂到平台状态上（系统页那一行动显示），不只留在「最近动态」里
           setMeta(`loginReason:${id}`, since ? `登录过期，这次保持了 ${((Date.now() - since) / 3600e3).toFixed(1)} 小时` : '登录过期，请重新扫码');
           log('', id, 'login-expired', since ? `保持了 ${((Date.now() - since) / 3600e3).toFixed(1)} 小时` : '');
-          await notify(`🔑 ${NAMES[id]}登录过期了${since ? `（这次保持了 ${((Date.now() - since) / 3600e3).toFixed(1)} 小时）` : ''}\n发布前请在专用 Chrome 里重新扫码：${LOGIN_PAGES[id]}`);
+          await notify(`🔑 ${NAMES[id]}登录过期了${since ? `（这次保持了 ${((Date.now() - since) / 3600e3).toFixed(1)} 小时）` : ''}\n发布前请在${drv.browserLabel}里重新扫码：${LOGIN_PAGES[id]}`);
         }
       }
       // X 长文模式：定时前 25 分钟启动长文脚本（每期只启动一次）
@@ -506,6 +506,9 @@ async function daemon() {
       const day = new Date().toLocaleDateString('zh-CN');
       if (new Date().getHours() >= 9 && getMeta('doctorDay') !== day) { setMeta('doctorDay', day); await doctor().catch((e) => console.error('体检出错：' + e.message)); }
     } catch (e) { console.error('守护循环出错：' + e.message); }
+    finally {
+      await drv.close({ interruptedOnly: true }).catch(e => console.error('Ego Lite 操作收尾失败：' + e.message));
+    }
     await drv.sleep(5 * MIN);
   }
 }
@@ -540,8 +543,8 @@ try {
     if (!ids.length) throw new Error('没有可打开的平台（都被停用了？）');
     const p = pluginInfo(), needStore = ids.some(canPublish) && p.source !== 'local' && !p.dir;
     await drv.openForLogin([...(needStore ? [STORE_URL] : []), ...ids.map(i => LOGIN_PAGES[i])]);
-    if (needStore) console.log(`第一步：在专用 Chrome 里的应用商店页面点「添加至 Chrome」，装上麦田发布助手（之后 Chrome 会自动更新它）`);
-    console.log(`专用 Chrome 已打开 ${ids.length} 个平台页面，登录完运行 hub doctor 检查`);
+    if (needStore) console.log(`请在${drv.browserLabel}的应用商店页面安装麦田发布助手${drv.browser === 'ego' ? '，并把 chrome://version 显示的资料路径填到 egoProfile' : ''}。`);
+    console.log(`${drv.browserLabel}已打开 ${ids.length} 个平台页面，登录完运行 hub doctor 检查`);
   }
   else if (cmd === 'metrics-accounts') { SKIP_METRICS = (opt('--skip') || '').split(','); await accountMetricsReport(); }
   else if (cmd === 'metrics-login') {
@@ -550,7 +553,7 @@ try {
     if (!target) throw Object.assign(new Error('请选择已启用的 B站账号'), { quiet: true });
     try { await drv.openTrafficLogin(target); }
     catch (e) { throw Object.assign(e, { quiet: true }); }
-    console.log(`${target.name}：请在专用 Chrome 登录，随后运行 hub metrics`);
+    console.log(`${target.name}：请在${drv.browserLabel}登录，随后运行 hub metrics-accounts`);
   }
   else if (cmd === 'followers') { await drv.ensure(); console.log(JSON.stringify(await collectFollowers(opt('--only') ? opt('--only').split(',') : null, opt('--skip') ? opt('--skip').split(',') : []), null, 1)); }
   else if (cmd === 'daemon') await daemon();
@@ -563,4 +566,6 @@ try {
   else if (cmd === 'notify-test') await notify('发布中控已接通 ✅');
   else console.log('用法：hub login [--only a,b] | doctor [--only a,b] [--quiet] | run <工程目录> [--only a,b] [--force] | status [id] [--logs] | sync <id> | followers [--skip xhs] | metrics [id] [--skip xhs] | metrics-accounts [--skip a,b] | metrics-login <bilibili[@账号]> | mark <id> <平台> <状态> | submit <id> <instagram|youtube|x> | daemon');
 } catch (e) { console.error('出错：' + e.message); if (!e.quiet) await notify(`❌ 发布中控出错：${e.message.slice(0, 300)}${helpTip()}`); code = 1; }
-await drv.close(); db.close(); process.exit(code);
+try { await drv.close(); }
+catch (e) { console.error('浏览器操作收尾失败：' + e.message); code = 1; }
+db.close(); process.exit(code);

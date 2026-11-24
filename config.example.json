@@ -6,6 +6,8 @@
   "plugin": "store",
   "bridge": "http://127.0.0.1:8765",
   "driver": "direct",
+  "browser": "ego",
+  "egoProfile": "",
   "learnLinks": true,
   "chromePort": 9333,
   "chromeProfile": "~/publish-hub/chrome-profile",

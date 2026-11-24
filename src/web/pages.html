@@ -69,7 +69,7 @@ function vTraffic() {
 }
 
 function vAccountTraffic() {
-  const { accounts, videos, statuses, history, direct } = accountTraffic;
+  const { accounts, videos, statuses, history, direct, browser } = accountTraffic;
   const name = id => accounts.find(a => a.id === id)?.name || id;
   const platform = id => accounts.find(a => a.id === id)?.platform || id;
   const pageCount = Math.max(1, Math.ceil(videos.length / 50));
@@ -84,7 +84,7 @@ function vAccountTraffic() {
   return `<div class="h1">流量</div><p class="lead">已发布的账号作品，与发布工程分开。失败时保留上次成功数据。</p>
   <div class="btns traffic-switch">${button({type:'metricsAccounts'}, running ? '采集中…' : '采集账号流量', 'pri')}${abtn({type:'followers'}, '采集粉丝')}${last && !last.ok ? `<span role="status">${esc(last.tail.trim().split('\n').at(-1) || '采集失败')}</span>` : ''}</div>
   <div class="grid g3">${tile('作品',fmt(videos.length))}${tile('累计播放',fmt(total('views')))}${tile('累计点赞',fmt(total('likes')))}</div>
-  ${sec('账号')}<div class="panel"><div class="tw"><table><thead><tr><th>账号</th><th class="n">作品</th><th>上次成功</th><th>采集结果</th><th></th></tr></thead><tbody>${statuses.map(st => `<tr><td>${logo(platform(st.id))}${esc(name(st.id))}</td><td class="n">${fmt(st.count)}</td><td>${when(st.syncedAt) || '未采集'}</td><td role="status">${esc(st.error || (st.syncedAt ? '已采集' : '未采集'))}</td><td>${direct && st.id.startsWith('bilibili@') ? button({ type:'metricsLogin', id:st.id }, '打开登录页') : ''}</td></tr>`).join('')}</tbody></table></div></div>
+  ${sec('账号')}<div class="panel"><div class="tw"><table><thead><tr><th>账号</th><th class="n">作品</th><th>上次成功</th><th>采集结果</th><th></th></tr></thead><tbody>${statuses.map(st => `<tr><td>${logo(platform(st.id))}${esc(name(st.id))}</td><td class="n">${fmt(st.count)}</td><td>${when(st.syncedAt) || '未采集'}</td><td role="status">${esc(st.error || (st.syncedAt ? '已采集' : '未采集'))}</td><td>${direct && browser !== 'ego' && st.id.startsWith('bilibili@') ? button({ type:'metricsLogin', id:st.id }, '打开登录页') : ''}</td></tr>`).join('')}</tbody></table></div></div>
   ${sec('作品')}<div class="panel"><div class="tw"><table><thead><tr><th>作品</th><th>账号</th><th>发布</th><th class="n">播放</th><th class="n">赞</th><th class="n">评论</th><th class="n">收藏</th><th class="n">转发</th></tr></thead><tbody>${rows.map(v => `<tr><td>${safeUrl(v.url) ? `<a href="${safeUrl(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a>` : esc(v.title)}</td><td>${esc(name(v.platform))}</td><td>${when(v.publishedAt).split(' ')[0] || '–'}</td>${['views','likes','comments','favorites','shares'].map(k => `<td class="n">${fmt(v[k])}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="8">还没有作品数据。</td></tr>'}</tbody></table></div></div>
   ${pageCount > 1 ? `<div class="btns traffic-switch"><button type="button" class="btn" data-traffic-page="${trafficPage-1}" ${trafficPage === 0 ? 'disabled' : ''}>上一页</button><span>${trafficPage+1} / ${pageCount}</span><button type="button" class="btn" data-traffic-page="${trafficPage+1}" ${trafficPage === pageCount-1 ? 'disabled' : ''}>下一页</button></div>` : ''}
   ${lines.length ? `${sec('累计播放走势')}<div class="panel"><div class="chartbox" id="account-lines"></div></div>` : ''}
@@ -246,7 +246,7 @@ function settingsHTML(s) {
     <label class="account-enabled"><input type="checkbox" name="accountEnabled" ${a.enabled !== false ? 'checked' : ''}>采集账号数据</label>
     ${a.id !== 'default' ? `<button type="button" class="btn" data-remove-account="${i}" aria-label="移除账号 ${i + 1}">移除</button>` : ''}</fieldset>`).join('');
   return `<form id="settings-form"><div class="accounts">${accounts}</div>
-    <div class="settings-footer"><button type="button" class="btn" data-add-account ${O.driver === 'plugin' ? 'disabled' : ''}>添加账号</button><button type="submit" class="btn pri">保存</button><span id="settings-message" role="status" aria-live="polite"></span></div></form>`;
+    <div class="settings-footer"><button type="button" class="btn" data-add-account ${O.driver === 'plugin' || O.health.browser?.id === 'ego' ? 'disabled' : ''}>添加账号</button><button type="submit" class="btn pri">保存</button>${O.health.browser?.id === 'ego' ? '<span class="note">B站副号需要使用专用 Chrome</span>' : ''}<span id="settings-message" role="status" aria-live="polite"></span></div></form>`;
 }
 function readSettings(form) {
   return { bilibiliAccounts: [...form.querySelectorAll('[data-account]')].map(row => ({
@@ -362,10 +362,11 @@ function platformRow(p) {
 
 function vSystem() {
   const h = O.health, today = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }), cur = O.episodes?.[0], ps = h.platforms || [];
+  const browser = h.browser || { name: '专用浏览器', status: h.chrome ? '在线' : '没开' };
   const dates = ps.filter(p => !p.disabled && p.day).map(p => p.day);
   const lastCheck = dates.sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true })).at(-1);
   return `<div class="h1">系统</div><p class="lead">麦田的运行情况与账号设置。</p>
-  <div class="grid g4">${tile('守护进程', '运行中', '开机自启，崩溃自动拉起')}${tile('NAS', h.nas ? '已挂载' : '读不到', h.nas ? '工程目录可读' : '取链接和封面会失败')}${tile('专用浏览器', h.chrome ? '在线' : '没开', '各平台的登录都在这里')}${tile('平台登录', platformSummary(h), lastCheck ? `最近检查 ${esc(lastCheck)}${lastCheck === today ? '（今天）' : ''}` : '点击「检查」可查看账号登录状态')}</div>
+  <div class="grid g4">${tile('守护进程', '运行中', '开机自启，崩溃自动拉起')}${tile('NAS', h.nas ? '已挂载' : '读不到', h.nas ? '工程目录可读' : '取链接和封面会失败')}${tile(browser.name, browser.status, '各平台的登录都在这里')}${tile('平台登录', platformSummary(h), lastCheck ? `最近检查 ${esc(lastCheck)}${lastCheck === today ? '（今天）' : ''}` : '点击「检查」可查看账号登录状态')}</div>
   ${sec('平台', '登录、体检和常用操作；扫码要人在这台电脑前')}
   <div class="panel"><div class="btns" style="margin-bottom:4px">${abtn({ type: 'doctor' }, '全部检查', 'pri')}${abtn({ type: 'login' }, '打开全部登录页')}${cur ? abtn({ type: 'sync', id: cur.id }, `取「${esc(cur.nick)}」的链接`) : ''}${abtn({ type: 'metrics' }, '采流量')}${abtn({ type: 'followers' }, '采粉丝')}</div>
     ${ps.map(platformRow).join('') || '<div class="empty">没有平台</div>'}</div>
